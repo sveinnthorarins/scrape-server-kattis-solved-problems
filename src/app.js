@@ -41,7 +41,7 @@ app.get('/', async (req, res, next) => {
       updateScrapedInfo();
     }
     if (solvedProblems === undefined) {
-      let data = await query('SELECT name, href FROM solvedproblems;');
+      let data = await query('SELECT * FROM solvedproblems ORDER BY name;');
       solvedProblems = data.rows;
     }
     return res.json(solvedProblems);
