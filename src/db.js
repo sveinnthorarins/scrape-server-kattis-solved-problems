@@ -56,7 +56,7 @@ export async function upsertSolvedProblems(problemsArray) {
   dateNow = new Date(dateNow.getFullYear(), dateNow.getMonth(), dateNow.getDate());
   
   try {
-    await query('INSERT INTO lastfetchdata (id, fetchDate) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET fetchDate = $2;', [1, dateNow.toISOString().slice(0,10)]);
+    await query('INSERT INTO lastfetchdate (id, fetchDate) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET fetchDate = $2;', [1, dateNow.toISOString().slice(0,10)]);
   } catch(err) {
     console.error('Error inserting lastFetchDate into database:\n', err);
     return null;
