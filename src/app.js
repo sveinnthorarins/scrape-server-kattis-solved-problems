@@ -5,21 +5,25 @@ import { fetchAndScrape } from './scrape.js';
 
 dotenv.config();
 
-const {
-  PORT: port = 3000,
-} = process.env;
+const { PORT: port = 3000 } = process.env;
 
 const app = express();
 let lastFetchDate;
 let solvedProblems;
 
 app.use(express.urlencoded());
+app.use((req, res, next) => {
+  res.append('Access-Control-Allow-Origin', ['*']);
+  res.append('Access-Control-Allow-Methods', 'GET');
+  res.append('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+});
 
 async function updateScrapedInfo() {
   let problemsArray;
   try {
     problemsArray = await fetchAndScrape();
-  } catch(err) {
+  } catch (err) {
     console.error('Error fetching and scraping:\n', err);
     return 1;
   }
@@ -43,8 +47,8 @@ app.get('/', async (req, res, next) => {
       solvedProblems = data.rows;
     }
     return res.json(solvedProblems);
-  } catch(err) {
-    console.error('Error in GET \'/\' function (error selecting from database):\n', err);
+  } catch (err) {
+    console.error("Error in GET '/' function (error selecting from database):\n", err);
     next(err);
   }
 });
