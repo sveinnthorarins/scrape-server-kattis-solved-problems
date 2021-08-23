@@ -11,7 +11,6 @@ const app = express();
 let lastFetchDate;
 let solvedProblems;
 
-app.use(express.urlencoded());
 app.use((req, res, next) => {
   res.append('Access-Control-Allow-Origin', ['*']);
   res.append('Access-Control-Allow-Methods', 'GET');
