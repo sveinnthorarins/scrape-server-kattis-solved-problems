@@ -1,6 +1,7 @@
-import * as cheerio from 'cheerio';
 import dotenv from 'dotenv';
+import fetch from 'node-fetch';
 import * as nodemailer from 'nodemailer';
+import * as cheerio from 'cheerio';
 
 dotenv.config();
 
@@ -25,7 +26,7 @@ const emailTransporter = nodemailer.createTransport({
 });
 
 export async function fetchAndScrape() {
-  const headers = new Headers({ 'cookie': cookieString });
+  const headers = { 'cookie': cookieString };
   const response = await fetch(
     'https://open.kattis.com/problems?show_solved=on&show_tried=off&show_untried=off',
     { headers: headers }
