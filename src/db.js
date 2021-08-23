@@ -3,10 +3,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const {
-  DATABASE_URL: connectionString,
-  NODE_ENV: nodeEnv = 'development',
-} = process.env;
+const { DATABASE_URL: connectionString, NODE_ENV: nodeEnv = 'development' } = process.env;
 
 if (!connectionString) {
   console.error('Missing DATABASE_URL in environment variables.');
@@ -41,26 +38,40 @@ export async function upsertSolvedProblems(problemsArray) {
   const promisesArray = [];
   problemsArray.forEach((obj) => {
     promisesArray.push(
-      query('INSERT INTO solvedproblems (name, href) VALUES ($1, $2) ON CONFLICT (name) DO UPDATE SET href = $2;', [obj.name, obj.href])
+      query('INSERT INTO solvedproblems (name, href) VALUES ($1, $2) ON CONFLICT (name) DO UPDATE SET href = $2;', [
+        obj.name,
+        obj.href,
+      ]),
     );
   });
-  
+
   try {
     await Promise.all(promisesArray);
-  } catch(err) {
+  } catch (err) {
     console.error('Error inserting scraped data into database:\n', err);
     return null;
   }
-  
+
   let dateNow = new Date();
   dateNow = new Date(dateNow.getFullYear(), dateNow.getMonth(), dateNow.getDate());
-  
+
   try {
-    await query('INSERT INTO lastfetchdate (id, fetchDate) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET fetchDate = $2;', [1, dateNow.toISOString().slice(0,10)]);
-  } catch(err) {
+    await query(
+      'INSERT INTO lastfetchdate (id, fetchDate) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET fetchDate = $2;',
+      [1, dateNow.toISOString().slice(0, 10)],
+    );
+  } catch (err) {
     console.error('Error inserting lastFetchDate into database:\n', err);
     return null;
   }
-  
-  return [problemsArray, dateNow];
+
+  let data;
+  try {
+    data = await query('SELECT * FROM solvedproblems ORDER BY name;');
+  } catch (err) {
+    console.error('Error selecting solved problems from database after insertion:\n', err);
+    return null;
+  }
+
+  return [data.rows, dateNow];
 }
