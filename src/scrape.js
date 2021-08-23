@@ -51,7 +51,7 @@ export async function fetchAndScrape() {
   const data = await response.text();
   const array = [];
   let $ = cheerio.load(data);
-  $('td.name_column > a').each((_idx, el) => array.push({ name: $(el).text(), href: $(el).attr('href') }));
+  $('td.name_column > a').each((_idx, el) => array.push({ name: $(el).text(), href: `https://open.kattis.com${$(el).attr('href')}`}));
   if($('#problem_list_next').length > 0) {
     let res, resData;
     do {
