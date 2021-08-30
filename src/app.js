@@ -37,12 +37,16 @@ app.get('/', async (req, res, next) => {
       let queryResult = await query('SELECT fetchdate FROM lastfetchdate WHERE id = 1;');
       lastFetchDate = new Date(queryResult.rows[0].fetchdate);
     }
-    if (lastFetchDate < dateNow) {
-      updateScrapedInfo();
-    }
     if (solvedProblems === undefined) {
       let data = await query('SELECT * FROM solvedproblems ORDER BY name;');
       solvedProblems = data.rows;
+    }
+    if (lastFetchDate < dateNow) {
+      updateScrapedInfo(); // update but do not wait
+      // return old list, but leave a refresh notification object to
+      // indicate the list is old and server is refreshing list in the background
+      // and client should query again in a bit
+      return res.json([{ refresh: true }, ...solvedProblems]);
     }
     return res.json(solvedProblems);
   } catch (err) {
