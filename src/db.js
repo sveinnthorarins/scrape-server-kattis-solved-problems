@@ -57,7 +57,7 @@ export async function upsertSolvedProblems(problemsArray) {
 
   try {
     await query(
-      'INSERT INTO lastfetchdate (id, fetchDate) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET fetchDate = $2;',
+      'INSERT INTO lastfetchdate (id, fetchdate) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET fetchdate = $2;',
       [1, dateNow.toISOString().slice(0, 10)],
     );
   } catch (err) {

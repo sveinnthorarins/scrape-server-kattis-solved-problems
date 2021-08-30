@@ -7,5 +7,5 @@ CREATE TABLE IF NOT EXISTS solvedproblems (
 
 CREATE TABLE IF NOT EXISTS lastfetchdate (
   id serial primary key,
-  fetchDate date not null
+  fetchdate date not null
 );

@@ -34,8 +34,8 @@ app.get('/', async (req, res, next) => {
     let dateNow = new Date();
     dateNow = new Date(dateNow.getFullYear(), dateNow.getMonth(), dateNow.getDate());
     if (lastFetchDate === undefined) {
-      let queryResult = await query('SELECT fetchDate FROM lastfetchdate WHERE id = 1;');
-      lastFetchDate = new Date(queryResult.rows[0].fetchDate);
+      let queryResult = await query('SELECT fetchdate FROM lastfetchdate WHERE id = 1;');
+      lastFetchDate = new Date(queryResult.rows[0].fetchdate);
     }
     if (lastFetchDate < dateNow) {
       updateScrapedInfo();
