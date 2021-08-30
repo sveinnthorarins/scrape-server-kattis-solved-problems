@@ -16,7 +16,7 @@ Start by uploading this repo to the host. If you are using a service like Heroku
 
 The host will need to have a PostgreSQL server set up. If you are using Heroku you can add a Heroku Postgres instace to your app.
 
-Several environment variables need to be set for this project to work. Take a look at the `.env.example` for an example. If you are using a service like Heroku the last three variables will be set automatically (DATABASE*URL, NODE_ENV, PORT). The first four need to be set manually (KATTIS_USER_COOKIE, GMAIL_AUTH_USERNAME, GMAIL_AUTH_PASSWORD, GMAIL_OUT_ADDRESS). The GMAIL_AUTH* variables are used for logging into a Gmail account and the GMAIL_OUT_ADDRESS is the email address (doesn't have to be Gmail) that the email notification will be sent to.
+Several environment variables need to be set for this project to work. Take a look at the `.env.example` for an example. If you are using a service like Heroku the last three variables will be set automatically (DATABASE_URL, NODE_ENV, PORT). The first four need to be set manually (KATTIS_USER_COOKIE, GMAIL_AUTH_USERNAME, GMAIL_AUTH_PASSWORD, GMAIL_OUT_ADDRESS). The GMAIL_AUTH* variables are used for logging into a Gmail account and the GMAIL_OUT_ADDRESS is the email address (doesn't have to be Gmail) that the email notification will be sent to.
 
 The setup/build script (in `package.json`) needs to be run for initial setup of the PostgreSQL database. If you are using a service like Heroku they will likely run the build script automatically.
 
