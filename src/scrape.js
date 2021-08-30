@@ -42,16 +42,20 @@ export async function fetchAndScrape() {
     emailTransporter.sendMail({
       from: gmailUsername,
       to: gmailAddress,
-      subject: 'Message from your fetch and scrape program',
-      text: `Hi Sveinn. Your little program here. The Kattis user cookie in the Heroku environment variables needs to be changed to: ${cookieString}`
+      subject: 'Message from your Kattis fetch and scrape program',
+      text: `Hi there developer. Your little program here. The Kattis user cookie in the environment variables needs to be changed to: ${cookieString}`
     }, (err, info) => {
       if (err) console.error('Error sending email about cookie change:\n', err);
     });
   }
+  
+  // prepare scraping
   const data = await response.text();
   const array = [];
   let $ = cheerio.load(data);
-  $('td.name_column > a').each((_idx, el) => array.push({ name: $(el).text(), href: `https://open.kattis.com${$(el).attr('href')}`}));
+  // scrape solved problems and add to array
+  $('td.name_column > a').each((_idx, el) => array.push({ name: $(el).text(), href: `https://open.kattis.com${$(el).attr('href')}` }));
+  // check if there is a next page of solved problems
   if($('#problem_list_next').length > 0) {
     let res, resData;
     do {
@@ -62,8 +66,10 @@ export async function fetchAndScrape() {
       if (!res.ok) return new Promise.reject(`response not ok, status ${res.status}`);
       resData = await res.text();
       $ = cheerio.load(resData);
-      $('td.name_column > a').each((_idx, el) => array.push({ name: $(el).text(), href: $(el).attr('href') }));
+      // scrape solved problems and add to array
+      $('td.name_column > a').each((_idx, el) => array.push({ name: $(el).text(), href: `https://open.kattis.com${$(el).attr('href')}` }));
     } while ($('#problem_list_next').length > 0);
   }
+  
   return array;
 }
