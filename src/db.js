@@ -37,12 +37,21 @@ export async function end() {
 export async function upsertSolvedProblems(problemsArray) {
   const promisesArray = [];
   problemsArray.forEach((obj) => {
-    promisesArray.push(
-      query('INSERT INTO solvedproblems (name, href) VALUES ($1, $2) ON CONFLICT (name) DO UPDATE SET href = $2;', [
-        obj.name,
-        obj.href,
-      ]),
-    );
+    if (!obj.topplace) {
+      promisesArray.push(
+        query(
+          'INSERT INTO solvedproblems (name, href, fastest, mine) VALUES ($1, $2, $3, $4) ON CONFLICT (name) DO UPDATE SET href = $2, fastest = $3, mine = $4;',
+          [obj.name, obj.href, obj.fastest, obj.mine],
+        ),
+      );
+    } else {
+      promisesArray.push(
+        query(
+          'INSERT INTO solvedproblems (name, href, fastest, mine, topplace, tophref) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (name) DO UPDATE SET href = $2, fastest = $3, mine = $4, topplace = $5, tophref = $6;',
+          [obj.name, obj.href, obj.fastest, obj.mine, obj.topplace, obj.tophref],
+        ),
+      );
+    }
   });
 
   try {
