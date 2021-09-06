@@ -1,4 +1,3 @@
-DROP TABLE IF EXISTS solvedproblems;
 
 CREATE TABLE IF NOT EXISTS solvedproblems (
   id serial primary key,
@@ -9,8 +8,6 @@ CREATE TABLE IF NOT EXISTS solvedproblems (
   topplace varchar(32),
   tophref varchar(256)
 );
-
-DROP TABLE IF EXISTS lastfetchdate;
 
 CREATE TABLE IF NOT EXISTS lastfetchdate (
   id serial primary key,
