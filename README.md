@@ -2,10 +2,21 @@
 
 This project is a NodeJS server that scrapes information daily about a pre-defined user's solved problems on Kattis and stores it in a database.
 
-The server then responds with the scraped data to GET requests to its root address. The response is a JSON array of the user's solved problems as JSON objects with properties and typings like so:
+The server then responds with the scraped data to GET requests to its root address. The response is a JSON object of the following type:
 
 ```typescript
-type SolvedProblemInfo = {
+type Response = {
+  // whether the list in the response is old or not
+  old: boolean;
+  // list (array) of all of user's solved problems
+  solvedProblems: SolvedProblem[];
+}
+```
+
+Each solved problem is then a JSON object of the following type:
+
+```typescript
+type SolvedProblem = {
   // id of problem in database
   id: number;
   // name of problem
@@ -23,7 +34,7 @@ type SolvedProblemInfo = {
 };
 ```
 
-If the list of problems on the server is old, the server will respond with that old list and add a JSON object `{ refresh: true }` to the front of the array indicating the server is currently refreshing the list and client should query again in a few minutes (scraping takes about 12 secs per solved problem).
+If the list of problems on the server is old the server will respond with that old list and with the `old` property set to `true`. The server will then update the list (in the background) and the client should query again in a few minutes (scraping takes about 12 secs per solved problem).
 
 The scraping is performed by making a request to Kattis's solved problems page with a user cookie set (like the user is logged in) and then scraping the response for all the solved problems entries.
 

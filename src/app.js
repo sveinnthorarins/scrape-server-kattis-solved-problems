@@ -31,6 +31,7 @@ async function updateScrapedInfo() {
 
 app.get('/', async (req, res, next) => {
   try {
+    let old = false;
     let dateNow = new Date();
     dateNow = new Date(dateNow.getFullYear(), dateNow.getMonth(), dateNow.getDate());
     if (lastFetchDate === undefined) {
@@ -42,13 +43,13 @@ app.get('/', async (req, res, next) => {
       solvedProblems = data.rows;
     }
     if (lastFetchDate < dateNow) {
-      updateScrapedInfo(); // update but do not wait
-      // return old list, but leave a refresh notification object to
-      // indicate the list is old and server is refreshing list in the background
-      // and client should query again in a bit
-      return res.json([{ refresh: true }, ...solvedProblems]);
+      updateScrapedInfo(); // update but do not await return
+      // set old to true, this will indicate in our response that the list is old,
+      // server is currently refreshing list and client should query again in a bit
+      old = true;
     }
-    return res.json(solvedProblems);
+    // return whether list is old and the list of problems
+    return res.json({ old, solvedProblems });
   } catch (err) {
     console.error("Error in GET '/' function (error selecting from database):\n", err);
     next(err);
