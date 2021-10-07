@@ -1,38 +1,28 @@
 import dotenv from 'dotenv';
 import fetch from 'node-fetch';
-import * as nodemailer from 'nodemailer';
 import * as cheerio from 'cheerio';
 
 dotenv.config();
 
 const {
-  KATTIS_USER_COOKIE: cookieString,
-  GMAIL_AUTH_USERNAME: gmailUsername,
-  GMAIL_AUTH_PASSWORD: gmailPassword,
-  GMAIL_OUT_ADDRESS: gmailAddress,
-  MY_KATTIS_FULL_NAME: myKattisFullName,
-  MY_KATTIS_USERNAME: myKattisUsername,
+  KATTIS_USERNAME: kattisUsername,
+  KATTIS_PASSWORD: kattisPassword,
+  KATTIS_FULL_NAME: kattisFullName,
 } = process.env;
 
-if (!cookieString || !gmailUsername || !gmailPassword || !gmailAddress || !myKattisFullName || !myKattisUsername) {
-  console.error('Missing environment variables necessary for scraper.');
+if (!kattisUsername || !kattisPassword || !kattisFullName) {
+  console.error('Environment variables necessary for scraper are missing.');
   process.exit(1);
 }
 
-const emailTransporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: gmailUsername,
-    pass: gmailPassword,
-  },
-});
+let cookieString = null;
 
 const headers = {
   'user-agent':
     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36',
   'accept-language': 'en-US, en',
   referer: 'https://open.kattis.com',
-  cookie: cookieString,
+  //cookie: cookieString, // cookieString is null at first..
 };
 
 // delay utility function
@@ -41,45 +31,42 @@ async function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function signIn() {
+  const params = new URLSearchParams();
+  params.append('user', kattisUsername);
+  params.append('password', kattisPassword);
+  params.append('submit', 'Submit');
+  const response = await fetch('https://open.kattis.com/login/email?', { method: 'POST', body: params });
+  const cookieInfo = response.headers.get('set-cookie');
+  const begin = cookieInfo.indexOf('EduSiteCookie');
+  const end = cookieInfo.indexOf(';', begin);
+  cookieString = cookieInfo.slice(begin, end);
+  headers.cookie = cookieString;
+}
+
 // the main fetch and scrape function, exported for use by other files.
 // no try-catch blocks inside this function, must catch errors when calling this function.
 export async function fetchAndScrape() {
+  if (!cookieString) {
+    signIn();
+  }
+
   // fetch problems page
   const response = await fetch('https://open.kattis.com/problems?show_solved=on&show_tried=off&show_untried=off', {
     headers: headers,
   });
   if (!response.ok) return Promise.reject(`response not ok, status ${response.status}`);
-  if (response.headers.has('set-cookie')) {
-    // get new cookie information
-    const cookieInfo = response.headers.get('set-cookie');
-    const begin = cookieInfo.indexOf('EduSiteCookie');
-    const end = cookieInfo.indexOf(';', begin);
-    cookieString = cookieInfo.slice(begin, end);
-    headers.cookie = cookieString;
-    // send email to developer about cookie change
-    emailTransporter.sendMail(
-      {
-        from: gmailUsername,
-        to: gmailAddress,
-        subject: 'Message from your Kattis fetch and scrape program',
-        text: `Hi there developer. Your little program here. The Kattis user cookie in the environment variables needs to be changed to: ${cookieString}`,
-      },
-      (err, info) => {
-        if (err) console.error('Error sending email about cookie change:\n', err);
-      },
-    );
-    // log this
-    console.log('An email has been sent to the developer about necessary cookie change.');
-  }
 
   // prepare scraping
   const data = await response.text();
   const array = [];
   let $ = cheerio.load(data);
 
-  // make sure cookie worked and we are logged in.
-  // doing this as a precaution, not sure Kattis will send set-cookie header and renew expired cookies.
-  if ($('nav.user-nav li.user').length === 0) return Promise.reject('user cookie did not work, user not logged in');
+  // if cookie somehow didn't work and we need to log in again.
+  if ($('nav.user-nav li.user').length === 0) {
+    signIn();
+    return fetchAndScrape();
+  }
 
   // scrape solved problems and add to array
   $('td.name_column > a').each((_idx, el) =>
@@ -138,7 +125,7 @@ async function getAdditionalInformation(obj) {
 
   // check if user is in that top 10 list
   let me = tablebody.find('tr').filter((_idx, el) => {
-    return $(el).find('td').first().next().text() === myKattisFullName;
+    return $(el).find('td').first().next().text() === kattisFullName;
   });
   // if so, use that to add necessary properties
   if (me.length > 0) {
@@ -151,7 +138,7 @@ async function getAdditionalInformation(obj) {
     delay(4000);
 
     // fetch user's submission page
-    res = await fetch(obj.href.replace('problems', `users/${myKattisUsername}/submissions`), { headers: headers });
+    res = await fetch(obj.href.replace('problems', `users/${kattisUsername}/submissions`), { headers: headers });
     if (!res.ok)
       return Promise.reject(
         `response not ok when fetching submission information, status ${res.status}, problem ${obj.name}`,
