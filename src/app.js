@@ -70,4 +70,6 @@ app.use(errorHandler);
 // Use port variable from .env (for app to work on heroku)
 app.listen(port, () => {
   console.info(`Server running at http://localhost:${port}/`);
+  console.info(`Scraping for data...`);
+  updateScrapedInfo();
 });
