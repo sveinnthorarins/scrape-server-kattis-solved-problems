@@ -37,18 +37,22 @@ async function signIn() {
   params.append('password', kattisPassword);
   params.append('submit', 'Submit');
   const response = await fetch('https://open.kattis.com/login/email?', { method: 'POST', body: params });
+  if (!response.ok) return Promise.reject(`sign-in response not ok, status ${response.status}`);
   const cookieInfo = response.headers.get('set-cookie');
   const begin = cookieInfo.indexOf('EduSiteCookie');
   const end = cookieInfo.indexOf(';', begin);
   cookieString = cookieInfo.slice(begin, end);
+  if (!cookieString) return Promise.reject('unsuccessful sign-in attempt');
   headers.cookie = cookieString;
+  console.info('Successfully signed in kattis user');
 }
 
 // the main fetch and scrape function, exported for use by other files.
 // no try-catch blocks inside this function, must catch errors when calling this function.
 export async function fetchAndScrape() {
+  console.info('Starting fetch and scrape program');
   if (!cookieString) {
-    signIn();
+    await signIn();
   }
 
   // fetch problems page
@@ -102,6 +106,7 @@ export async function fetchAndScrape() {
   }
   // wait for the scraping of all problems to finish
   await Promise.all(promisesArray);
+  console.info('Successfully finished fetch and scrape program');
 
   return array;
 }
