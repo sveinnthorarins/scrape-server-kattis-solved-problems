@@ -15,14 +15,12 @@ if (!kattisUsername || !kattisPassword || !kattisFullName) {
   process.exit(1);
 }
 
-let cookieString = null;
-
 const headers = {
   'user-agent':
     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36',
   'accept-language': 'en-US, en',
   referer: 'https://open.kattis.com',
-  //cookie: cookieString, // cookieString is null at first..
+  cookie: '', // empty at first..
 };
 
 // delay utility function
@@ -32,18 +30,40 @@ async function delay(ms) {
 }
 
 async function signIn() {
+  // Perform GET to get csrf token and initial cookie
+  let response = await fetch('https://open.kattis.com/login/email?', {
+    headers: headers,
+  });
+  if (!response.ok) return Promise.reject(`initial response not ok, status ${response.status}`);
+  if (response.headers.has('set-cookie')) {
+    const cookieInfo = response.headers.get('set-cookie');
+    const begin = cookieInfo.indexOf('EduSiteCookie');
+    const end = cookieInfo.indexOf(';', begin);
+    headers.cookie = cookieInfo.slice(begin, end);
+  }
+  const data = await response.text();
+  const $ = cheerio.load(data);
+  const csrf = $('input[name=csrf_token]').attr('value');
+
+  // Perform POST to sign in user
   const params = new URLSearchParams();
+  params.append('csrf_token', csrf);
   params.append('user', kattisUsername);
   params.append('password', kattisPassword);
   params.append('submit', 'Submit');
-  const response = await fetch('https://open.kattis.com/login/email?', { method: 'POST', body: params });
+  response = await fetch('https://open.kattis.com/login/email?', {
+    method: 'POST',
+    body: params,
+    headers: headers,
+  });
   if (!response.ok) return Promise.reject(`sign-in response not ok, status ${response.status}`);
-  const cookieInfo = response.headers.get('set-cookie');
-  const begin = cookieInfo.indexOf('EduSiteCookie');
-  const end = cookieInfo.indexOf(';', begin);
-  cookieString = cookieInfo.slice(begin, end);
-  if (!cookieString) return Promise.reject('unsuccessful sign-in attempt');
-  headers.cookie = cookieString;
+  if (response.headers.has('set-cookie')) {
+    const cookieInfo = response.headers.get('set-cookie');
+    const begin = cookieInfo.indexOf('EduSiteCookie');
+    const end = cookieInfo.indexOf(';', begin);
+    headers.cookie = cookieInfo.slice(begin, end);
+  }
+  if (!headers.cookie) return Promise.reject('unsuccessful sign-in attempt');
   console.info('Successfully signed in kattis user');
 }
 
@@ -51,7 +71,7 @@ async function signIn() {
 // no try-catch blocks inside this function, must catch errors when calling this function.
 export async function fetchAndScrape() {
   console.info('Starting fetch and scrape program');
-  if (!cookieString) {
+  if (!headers.cookie) {
     await signIn();
   }
 
