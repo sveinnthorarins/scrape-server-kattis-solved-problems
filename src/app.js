@@ -10,6 +10,7 @@ const { PORT: port = 3000 } = process.env;
 const app = express();
 let lastFetchDate;
 let solvedProblems;
+let currentlyScraping = false;
 
 app.use((req, res, next) => {
   res.append('Access-Control-Allow-Origin', ['*']);
@@ -27,6 +28,7 @@ async function updateScrapedInfo() {
   }
   const data = await upsertSolvedProblems(problemsArray);
   if (data !== null) [solvedProblems, lastFetchDate] = data;
+  if (currentlyScraping) currentlyScraping = false;
 }
 
 app.get('/', async (req, res, next) => {
@@ -43,7 +45,10 @@ app.get('/', async (req, res, next) => {
       solvedProblems = data.rows;
     }
     if (lastFetchDate < dateNow) {
-      updateScrapedInfo(); // update but do not await return
+      if (!currentlyScraping) {
+        currentlyScraping = true;
+        updateScrapedInfo(); // update but do not await return
+      }
       // set old to true, this will indicate in our response that the list is old,
       // server is currently refreshing list and client should query again in a bit
       old = true;
@@ -71,5 +76,6 @@ app.use(errorHandler);
 app.listen(port, () => {
   console.info(`Server running at http://localhost:${port}/`);
   console.info(`Scraping for data...`);
+  currentlyScraping = true;
   updateScrapedInfo();
 });
