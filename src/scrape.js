@@ -2,6 +2,8 @@ import dotenv from 'dotenv';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 
+// configure environment variables
+
 dotenv.config();
 
 const {
@@ -15,13 +17,16 @@ if (!kattisUsername || !kattisPassword || !kattisFullName) {
   process.exit(1);
 }
 
+// variables
+
 const headers = {
-  'user-agent':
+  'User-Agent':
     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36',
-  'accept-language': 'en-US, en',
-  referer: 'https://open.kattis.com',
-  cookie: '', // empty at first..
+  'Accept-Language': 'en-US, en',
+  Cookie: '', // empty at first..
 };
+
+let justSignedIn = false;
 
 // delay utility function
 // used to wait before sending requests since we want to scrape politely :)
@@ -29,67 +34,79 @@ async function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function signIn() {
-  // Perform GET to get csrf token and initial cookie
-  let response = await fetch('https://open.kattis.com/login/email?', {
-    headers: headers,
-  });
-  if (!response.ok) return Promise.reject(`initial response not ok, status ${response.status}`);
-  if (response.headers.has('set-cookie')) {
-    const cookieInfo = response.headers.get('set-cookie');
+async function helperFetch(url, errorMessage = 'response not ok', options = {}) {
+  options.headers = headers;
+  const response = await fetch(url, options);
+  if (!response.ok && !options.redirect) return Promise.reject(`${errorMessage}, status ${response.status}`);
+  if (response.headers.has('Set-Cookie')) {
+    const cookieInfo = response.headers.get('Set-Cookie');
     const begin = cookieInfo.indexOf('EduSiteCookie');
     const end = cookieInfo.indexOf(';', begin);
-    headers.cookie = cookieInfo.slice(begin, end);
+    headers.Cookie = cookieInfo.slice(begin, end);
   }
   const data = await response.text();
-  const $ = cheerio.load(data);
-  const csrf = $('input[name=csrf_token]').attr('value');
+  // simple way to add delay in between requests
+  // by adding it to our helper fetch function
+  await delay(5000);
+  return data;
+}
 
-  // Perform POST to sign in user
-  const params = new URLSearchParams();
-  params.append('csrf_token', csrf);
-  params.append('user', kattisUsername);
-  params.append('password', kattisPassword);
-  params.append('submit', 'Submit');
-  response = await fetch('https://open.kattis.com/login/email?', {
-    method: 'POST',
-    body: params,
-    headers: headers,
-  });
-  if (!response.ok) return Promise.reject(`sign-in response not ok, status ${response.status}`);
-  if (response.headers.has('set-cookie')) {
-    const cookieInfo = response.headers.get('set-cookie');
-    const begin = cookieInfo.indexOf('EduSiteCookie');
-    const end = cookieInfo.indexOf(';', begin);
-    headers.cookie = cookieInfo.slice(begin, end);
+async function signIn() {
+  try {
+    // Perform GET to scrape csrf token and set initial cookie
+    const data = await helperFetch('https://open.kattis.com/login/email?', 'sign-in GET response not ok');
+    const $ = cheerio.load(data);
+    const csrf = $('input[name=csrf_token]').attr('value');
+    // Perform POST to sign in user
+    const params = new URLSearchParams();
+    params.append('csrf_token', csrf);
+    params.append('user', kattisUsername);
+    params.append('password', kattisPassword);
+    params.append('submit', 'Submit');
+    await helperFetch('https://open.kattis.com/login/email?', 'sign-in POST response not ok', {
+      method: 'POST',
+      body: params,
+      redirect: 'manual',
+    });
+  } catch (e) {
+    return Promise.reject(e);
   }
-  if (!headers.cookie) return Promise.reject('unsuccessful sign-in attempt');
   console.info('Successfully signed in kattis user');
+  justSignedIn = true;
+  setTimeout(() => {
+    justSignedIn = false;
+  }, 600000);
 }
 
 // the main fetch and scrape function, exported for use by other files.
-// no try-catch blocks inside this function, must catch errors when calling this function.
 export async function fetchAndScrape() {
   console.info('Starting fetch and scrape program');
-  if (!headers.cookie) {
-    await signIn();
+  if (!headers.Cookie) {
+    try {
+      await signIn();
+    } catch (e) {
+      return Promise.reject('Error signing in kattis user:\n' + e);
+    }
   }
 
   // fetch problems page
-  const response = await fetch('https://open.kattis.com/problems?show_solved=on&show_tried=off&show_untried=off', {
-    headers: headers,
-  });
-  if (!response.ok) return Promise.reject(`response not ok, status ${response.status}`);
+  let data;
+  try {
+    data = await helperFetch('https://open.kattis.com/problems?show_solved=on&show_tried=off&show_untried=off');
+  } catch (e) {
+    return Promise.reject('Error fetching problems:\n' + e);
+  }
 
   // prepare scraping
-  const data = await response.text();
   const array = [];
   let $ = cheerio.load(data);
 
   // if cookie somehow didn't work and we need to log in again.
   if ($('nav.user-nav li.user').length === 0) {
-    signIn();
-    return fetchAndScrape();
+    if (!justSignedIn) {
+      headers.Cookie = '';
+      return fetchAndScrape();
+    } else return Promise.reject('several unsuccessful sign-in attempts, stopping scraping program...');
   }
 
   // scrape solved problems and add to array
@@ -100,13 +117,14 @@ export async function fetchAndScrape() {
   // check if there is a next page of solved problems,
   // if so, go through all pages, scrape and add problems to array
   if ($('#problem_list_next').length > 0) {
-    let res, resData;
+    let resData;
     do {
-      await delay(5000); // wait 5 secs before next request
       // fetch next page
-      res = await fetch(`https://open.kattis.com${$('#problem_list_next').attr('href')}`, { headers: headers });
-      if (!res.ok) return Promise.reject(`response not ok, status ${res.status}`);
-      resData = await res.text();
+      try {
+        resData = await helperFetch(`https://open.kattis.com${$('#problem_list_next').attr('href')}`);
+      } catch (e) {
+        return Promise.reject('Error fetching problems:\n' + e);
+      }
       // load page with cheerio
       $ = cheerio.load(resData);
       // scrape solved problems and add to array
@@ -116,16 +134,15 @@ export async function fetchAndScrape() {
     } while ($('#problem_list_next').length > 0 && $('#problem_list_next').attr('href') !== undefined);
   }
 
-  // need to scrape additional information about each and every problem
-  let promisesArray = [];
-  for (const obj of array) {
-    // wait around 8-15 secs before fetching info about next problem
-    await delay(Math.floor((Math.random() * 7 + 8) * 1000));
-    // fetch and scrape additional info about problem
-    promisesArray.push(getAdditionalInformation(obj));
+  try {
+    // need to scrape additional information about each and every problem
+    for (const obj of array) {
+      await getAdditionalInformation(obj);
+    }
+  } catch (e) {
+    return Promise.reject('Error scraping additional information:\n' + e);
   }
-  // wait for the scraping of all problems to finish
-  await Promise.all(promisesArray);
+
   console.info('Successfully finished fetch and scrape program');
 
   return array;
@@ -133,66 +150,64 @@ export async function fetchAndScrape() {
 
 // function for getting additional information about each problem
 async function getAdditionalInformation(obj) {
-  // fetch statistics page
-  let statsHref = `${obj.href}/statistics`;
-  let res = await fetch(statsHref, { headers: headers });
-  if (!res.ok)
-    return Promise.reject(
-      `response not ok when fetching additional information, status ${res.status}, problem ${obj.name}`,
+  try {
+    // fetch statistics page
+    let statsHref = `${obj.href}/statistics`;
+    let resData = await helperFetch(
+      statsHref,
+      `response not ok when fetching additional information about problem ${obj.name}`,
     );
-  let resData = await res.text();
 
-  // scrape for fastest solution
-  let $ = cheerio.load(resData);
-  let tablebody = $('#toplist0 tbody');
-  if (tablebody.length > 1) tablebody = tablebody.first();
-  obj.fastest = tablebody.find('tr').first().find('td.runtime').text();
+    // scrape for fastest solution
+    let $ = cheerio.load(resData);
+    let tablebody = $('#toplist0 tbody');
+    if (tablebody.length > 1) tablebody = tablebody.first();
+    obj.fastest = tablebody.find('tr').first().find('td.runtime').text();
 
-  // check if user is in that top 10 list
-  let me = tablebody.find('tr').filter((_idx, el) => {
-    return $(el).find('td').first().next().text() === kattisFullName;
-  });
-  // if so, use that to add necessary properties
-  if (me.length > 0) {
-    obj.topplace = me.find('td').first().text();
-    obj.tophref = statsHref;
-    obj.mine = me.find('td.runtime').text();
-  } else {
-    // else we need to perform a separate fetch for user's solution time
-    // wait 4 secs
-    delay(4000);
+    // check if user is in that top 10 list
+    let me = tablebody.find('tr').filter((_idx, el) => {
+      return $(el).find('td').first().next().text() === kattisFullName;
+    });
+    // if so, use that to add necessary properties
+    if (me.length > 0) {
+      obj.topplace = me.find('td').first().text();
+      obj.tophref = statsHref;
+      obj.mine = me.find('td.runtime').text();
+    } else {
+      // else we need to perform a separate fetch for user's solution time
 
-    // fetch user's submission page
-    res = await fetch(obj.href.replace('problems', `users/${kattisUsername}/submissions`), { headers: headers });
-    if (!res.ok)
-      return Promise.reject(
-        `response not ok when fetching submission information, status ${res.status}, problem ${obj.name}`,
+      // fetch user's submission page
+      const url = obj.href.replace('problems', `users/${kattisUsername}/submissions`);
+      resData = await helperFetch(
+        url,
+        `response not ok when fetching submission information about problem ${obj.name}`,
       );
-    resData = await res.text();
 
-    // scrape user's accepted submissions
-    $ = cheerio.load(resData);
-    let tablerows = $('table > tbody > tr').filter((_idx, el) => {
-      return $(el).find('td[data-type=status] > span').hasClass('accepted');
-    });
+      // scrape user's accepted submissions
+      $ = cheerio.load(resData);
+      let tablerows = $('table > tbody > tr').filter((_idx, el) => {
+        return $(el).find('td[data-type=status] > span').hasClass('accepted');
+      });
 
-    let min = {
-      text: '',
-      speed: 10000.0,
-    };
+      let min = {
+        text: '',
+        speed: 10000.0,
+      };
 
-    // go through all accepted submission and find the one with lowest cpu time
-    tablerows.each((_idx, el) => {
-      const speedText = $(el).find('td[data-type=cpu]').text();
-      const speed = Number.parseFloat(speedText.replace('&nbsp;s', ''));
-      if (speed < min.speed) {
-        min.speed = speed;
-        min.text = speedText;
-      }
-    });
+      // go through all accepted submission and find the one with lowest cpu time
+      tablerows.each((_idx, el) => {
+        const speedText = $(el).find('td[data-type=cpu]').text();
+        const speed = Number.parseFloat(speedText.replace('&nbsp;s', ''));
+        if (speed < min.speed) {
+          min.speed = speed;
+          min.text = speedText;
+        }
+      });
 
-    obj.mine = min.text;
+      obj.mine = min.text;
+    }
+  } catch (e) {
+    return Promise.reject(e);
   }
-
   return Promise.resolve();
 }

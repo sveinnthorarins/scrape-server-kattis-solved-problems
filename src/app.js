@@ -23,8 +23,8 @@ async function updateScrapedInfo() {
   try {
     problemsArray = await fetchAndScrape();
   } catch (err) {
-    console.error('Error fetching and scraping:\n', err);
-    return 1;
+    console.error('Error fetching and scraping:\n' + err);
+    return;
   }
   const data = await upsertSolvedProblems(problemsArray);
   if (data !== null) [solvedProblems, lastFetchDate] = data;
@@ -75,7 +75,6 @@ app.use(errorHandler);
 // Use port variable from .env (for app to work on heroku)
 app.listen(port, () => {
   console.info(`Server running at http://localhost:${port}/`);
-  console.info(`Scraping for data...`);
   currentlyScraping = true;
   updateScrapedInfo();
 });
